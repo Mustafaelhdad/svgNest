@@ -31,6 +31,9 @@
     };
   }
 
+  // 	The tolerance parameter is used to determine the precision when converting curved segments (such as Bezier curves and arcs) into linear segments. A smaller tolerance results in a higher precision approximation (more points along the curve), while a larger tolerance creates a less detailed approximation (fewer points).
+  // By allowing the tolerance value to be configured, the function provides flexibility in balancing between precision and performance, depending on the use case.
+
   SvgParser.prototype.config = function (config) {
     this.conf.tolerance = config.tolerance;
   };
@@ -292,6 +295,8 @@
     return matrix;
   };
 
+  // The overall purpose of applyTransform is to flatten transformations, ensuring all SVG elements' positions are explicitly defined without relying on separate transform attributes. This is useful for downstream processing, like geometric operations or rendering in different contexts.
+
   // recursively apply the transform property to the given element
   SvgParser.prototype.applyTransform = function (element, globalTransform) {
     globalTransform = globalTransform || "";
@@ -344,6 +349,7 @@
               parseFloat(element.getAttribute("rx")),
             element.getAttribute("cy")
           );
+
           var arc1 = path.createSVGPathSegArcAbs(
             parseFloat(element.getAttribute("cx")) +
               parseFloat(element.getAttribute("rx")),
@@ -354,6 +360,7 @@
             1,
             0
           );
+
           var arc2 = path.createSVGPathSegArcAbs(
             parseFloat(element.getAttribute("cx")) -
               parseFloat(element.getAttribute("rx")),
@@ -578,6 +585,12 @@
     }
   };
 
+  // Resulting Structure:
+  // After the function runs, all elements will be direct children of the <svg> element, without any nested <g> elements or other containers.
+
+  // Purpose
+  // The goal of this function is to simplify the SVG structure by eliminating groupings, making it easier for further processing. For operations like geometric transformations, nesting can complicate calculations, so flattening the hierarchy simplifies handling of each individual SVG element.
+
   // bring all child elements to the top level
   SvgParser.prototype.flatten = function (element) {
     for (var i = 0; i < element.childNodes.length; i++) {
@@ -590,6 +603,8 @@
       }
     }
   };
+
+  // This function essentially ensures that only specified types of elements remain in the SVG, which is useful for filtering out irrelevant elements for CAD/CAM or nesting operations.
 
   // remove all elements with tag name not in the whitelist
   // use this to remove <text>, <g> etc that don't represent shapes
@@ -611,6 +626,14 @@
       element.parentElement.removeChild(element);
     }
   };
+
+  // Return Added Paths
+  // The function returns an array of the newly created path elements, representing each individual subpath.
+  // What It Does:
+  // The function splits a single complex path with multiple subpaths into separate, simpler path elements.
+  // Each new path starts at a "move" command ("M" or "m"), indicating the beginning of a subpath.
+  // Use Case:
+  // This function is helpful in CAD/CAM operations where individual subpaths need to be processed separately, or when performing operations like nesting where distinct shapes must be handled independently.
 
   // split a compound path (paths with M, m commands) into an array of paths
   SvgParser.prototype.splitPath = function (path) {
@@ -696,6 +719,15 @@
     return addedPaths;
   };
 
+  // What It Does:
+  // The function recursively traverses the entire SVG DOM tree, starting from the given element, and applies the provided func to each element in a bottom-up manner (children are processed before their parents).
+  // Use Case:
+  // This function is useful for performing operations on every element in an SVG structure, such as:
+  // Flattening nested groups (<g> elements).
+  // Applying transformations.
+  // Filtering or modifying elements based on certain conditions.
+  // The bottom-up traversal ensures that any modifications to the child elements are completed before the parent element is processed.
+
   // recursively run the given function on the given element
   SvgParser.prototype.recurse = function (element, func) {
     // only operate on original DOM tree, ignore any children that are added. Avoid infinite loops
@@ -706,6 +738,12 @@
 
     func(element);
   };
+
+  // The polygonify function converts various types of SVG elements into a polygonal representation, represented as an array of points. The goal is to turn SVG shapes into a form that is suitable for computational geometry operations, such as nesting or collision detection.
+  // Return the Polygon
+  // Finally, the function returns the poly array, which contains the list of points representing the original SVG shape in polygonal form.
+  // Summary
+  // The polygonify function converts various SVG shapes into a list of points that approximate the shape. This makes it easier to perform operations like nesting or collision detection in computational geometry, where polygons are often the preferred representation over arbitrary SVG paths or shapes.
 
   // return a polygon from the given SVG element in the form of an array of points
   SvgParser.prototype.polygonify = function (element) {
@@ -720,6 +758,7 @@
           poly.push({ x: point.x, y: point.y });
         }
         break;
+
       case "rect":
         var p1 = {};
         var p2 = {};
@@ -743,6 +782,7 @@
         poly.push(p3);
         poly.push(p4);
         break;
+
       case "circle":
         var radius = parseFloat(element.getAttribute("r"));
         var cx = parseFloat(element.getAttribute("cx"));
@@ -766,6 +806,7 @@
           poly.push(point);
         }
         break;
+
       case "ellipse":
         // same as circle case. There is probably a way to reduce points but for convenience we will just flatten the equivalent circular polygon
         var rx = parseFloat(element.getAttribute("rx"));
@@ -792,6 +833,7 @@
           poly.push(point);
         }
         break;
+
       case "path":
         // we'll assume that splitpath has already been run on this path, and it only has one M/m command
         var seglist = element.pathSegList;
@@ -887,6 +929,7 @@
                 poly.push(point);
               }
               break;
+
             case "s":
             case "S":
               if (
@@ -916,6 +959,7 @@
                 poly.push(point);
               }
               break;
+
             case "a":
             case "A":
               var pointlist = GeometryUtil.Arc.linearize(
@@ -937,6 +981,7 @@
                 poly.push(point);
               }
               break;
+
             case "z":
             case "Z":
               x = x0;
