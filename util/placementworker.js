@@ -7,7 +7,7 @@ toClipperCoordinates, toNestCoordinates
 
 * PlacementWorker
 - هذه الدالة التي تقوم بوضع الأشكال داخل الشكل الاساسي container
-- تقوم بتدوير كل مسار حسب زاوية معينة ثم تستخدم NFP للتأكد من عدم التداخل
+- تقوم بتدوير كل مسار حسب زاوية معينة ثم تستخدم no-fit polygon (NFP) للتأكد من عدم التداخل
 - باستخدام clipper تقوم بعمل عمليات هندسية مثلل الاتحاد والفرق
 
 * يقوم الكود بتقييم الكفاءة بحساب المساحة المستخدمة
@@ -16,9 +16,11 @@ toClipperCoordinates, toNestCoordinates
 * يقوم الكود باستخدام web worker لتجنب تعطيل الواجهة الاساسية عند العمل ع مسارات معقدة
 */
 
+// Returns: A cloned polygon array in the required format by the Clipper library.
 // jsClipper uses X/Y instead of x/y...
 function toClipperCoordinates(polygon) {
   var clone = [];
+
   for (var i = 0; i < polygon.length; i++) {
     clone.push({
       X: polygon[i].x,
@@ -29,8 +31,10 @@ function toClipperCoordinates(polygon) {
   return clone;
 }
 
+// Returns: A cloned polygon array in the original coordinate format.
 function toNestCoordinates(polygon, scale) {
   var clone = [];
+
   for (var i = 0; i < polygon.length; i++) {
     clone.push({
       x: polygon[i].X / scale,
@@ -41,9 +45,11 @@ function toNestCoordinates(polygon, scale) {
   return clone;
 }
 
+// Returns: A rotated polygon.
 function rotatePolygon(polygon, degrees) {
   var rotated = [];
   var angle = (degrees * Math.PI) / 180;
+
   for (var i = 0; i < polygon.length; i++) {
     var x = polygon[i].x;
     var y = polygon[i].y;
@@ -55,6 +61,7 @@ function rotatePolygon(polygon, degrees) {
 
   if (polygon.children && polygon.children.length > 0) {
     rotated.children = [];
+
     for (var j = 0; j < polygon.children.length; j++) {
       rotated.children.push(rotatePolygon(polygon.children[j], degrees));
     }
@@ -63,6 +70,16 @@ function rotatePolygon(polygon, degrees) {
   return rotated;
 }
 
+/*
+  This function encapsulates the main logic for placing shapes inside a larger shape (container).
+  Arguments:
+  binPolygon: Container polygon.
+  paths: Array of shapes to nest.
+  ids, rotations: ID and rotation data for each shape.
+  config: Configuration settings, including scale.
+  nfpCache: Cache for No-Fit Polygons (NFP), which are areas where shapes cannot overlap.
+  Main Purpose: Calculates optimized positions and rotations for placing shapes without overlap.
+*/
 function PlacementWorker(binPolygon, paths, ids, rotations, config, nfpCache) {
   this.binPolygon = binPolygon;
   this.paths = paths;
@@ -86,6 +103,7 @@ function PlacementWorker(binPolygon, paths, ids, rotations, config, nfpCache) {
     var rotated = [];
     for (i = 0; i < paths.length; i++) {
       var r = rotatePolygon(paths[i], paths[i].rotation);
+
       r.rotation = paths[i].rotation;
       r.source = paths[i].source;
       r.id = paths[i].id;
@@ -96,7 +114,7 @@ function PlacementWorker(binPolygon, paths, ids, rotations, config, nfpCache) {
 
     var allplacements = [];
     var fitness = 0;
-    var binarea = Math.abs(GeometryUtil.polygonArea(self.binPolygon));
+    var binarea = Math.abs(GeometryUtil.polygonArea(self.binPolygon)); // Bin Area Calculation: Computes the area of the container polygon.
     var key, nfp;
 
     while (paths.length > 0) {
@@ -364,6 +382,7 @@ function PlacementWorker(binPolygon, paths, ids, rotations, config, nfpCache) {
     };
   };
 }
+
 (typeof window !== "undefined" ? window : self).PlacementWorker =
   PlacementWorker;
 
